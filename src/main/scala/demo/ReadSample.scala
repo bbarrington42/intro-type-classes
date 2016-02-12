@@ -40,10 +40,13 @@ object ReadSample extends App {
     implicit val ReadableDouble = toReadable[Double](_.toDouble)
     implicit val ReadableInt = toReadable[Int](_.toInt)
     implicit val ReadableLong = toReadable[Long](_.toLong)
-    implicit val ReadableString = toReadable[String](new String(_))
+    implicit val ReadableString = toReadable[String](identity)
     implicit val ReadableBoolean = toReadable[Boolean](_.toBoolean)
     implicit val ReadableCharList = toReadable[List[Char]](_.toCharArray.toList)
-    implicit val ReadableStringList = toReadable[List[String]](_.split(':').toList)
+//    implicit val ReadableStringList = toReadable[List[String]](_.split(':').toList)
+
+    // My additions
+    implicit def ReadableList[S: Readable]: Readable[List[S]] = toReadable[List[S]](_.split(",").map(implicitly[Readable[S]].read).toList)
 
     /**
       * Extend the string object with a read function.

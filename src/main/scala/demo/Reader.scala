@@ -8,98 +8,107 @@ import scala.annotation.implicitNotFound
 
 
 
-@implicitNotFound("No member of type class Reader in scope for ${A}")
-trait Reader[A] {
-  def read(s: String): A
+@implicitNotFound("No member of type class Reader in scope for ${T}")
+trait Reader[T] {
+  def read(s: String): T
+
+  // TODO Add readOption ?
 }
 
+/*
+  Grammar:
+    tuples: (x | y)
+    lists: x, y, z
+ */
 
 
 object Reader {
 
   val commaDelim = """\s*,\s*""".r
-  val equalDelim = """\s*=\s*""".r
-  val tupleDelim = """\)\s*,\s*\(""".r
-
-  val tuples = """,?\(([^)]+\s*,\s*[^)]+)\)""".r
-
-  val sequences = """""".r
+  val tupleDelim = """\s*\|\s*""".r
+  val tupleStart = """\s*\(\s*([^|]+)""".r
+  val tupleEnd = """([^|]+)\s*\)\s*""".r
 
 
-  private def read[T](f: String => T): Reader[T] =
-    new Reader[T] {
+  private def toReader[T](f: String => T): Reader[T] = new Reader[T] {
       def read(s: String) = f(s)
-    }
+  }
 
+  // For direct construction of a Readable instance
+  def apply[T: Reader]: Reader[T] = implicitly[Reader[T]]
+  // Same as:
+  // def apply[T](implicit instance: Reader[T]): Reader[T] = instance
+
+
+  // Not sure we need this (?)
   private def map[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
     override def read(s: String): B = f(reader.read(s))
   }
 
-  implicit val intRead: Reader[Int] = read(_.toInt)
+  implicit val intRead: Reader[Int] = toReader(_.toInt)
 
-  implicit val doubleRead: Reader[Double] = read(_.toDouble)
+  implicit val doubleRead: Reader[Double] = toReader(_.toDouble)
 
-  implicit val integerRead: Reader[Integer] = read(s => Integer.parseInt(s))
+  implicit val integerRead: Reader[Integer] = toReader(s => Integer.parseInt(s))
 
-  implicit val stringRead: Reader[String] = read(identity)
+  implicit val stringRead: Reader[String] = toReader(identity)
 
-  implicit val booleanRead: Reader[Boolean] = read(_.toBoolean)
+  implicit val booleanRead: Reader[Boolean] = toReader(_.toBoolean)
 
-  implicit val yyyymmdddRead: Reader[Calendar] = calendarReader("yyyy-MM-dd")
+  implicit val calendarRead: Reader[Calendar] = calendarReader("yyyy-MM-dd")
 
-  implicit val fileRead: Reader[File] = read(new File(_))
+  implicit val fileRead: Reader[File] = toReader(new File(_))
 
   private def calendarReader(pattern: String): Reader[Calendar] = calendarReader(pattern, Locale.getDefault)
   private def calendarReader(pattern: String, locale: Locale): Reader[Calendar] =
-    read { s =>
+    toReader { s =>
       val fmt = new SimpleDateFormat(pattern)
       val c = new GregorianCalendar
       c.setTime(fmt.parse(s))
       c
     }
 
-  implicit def tupleRead[A: Reader, B: Reader]: Reader[(A, B)] = read(s => {
-    val a = commaDelim.split(s)
-    implicitly[Reader[A]].read(a.head) -> implicitly[Reader[B]].read(a.last)
+
+  implicit def tupleRead[A: Reader, B: Reader]: Reader[(A, B)] = toReader(s => {
+    val a = tupleDelim.split(s)
+    implicitly[Reader[A]].read(tupleStart.replaceAllIn(a.head, _.group(1))) ->
+      implicitly[Reader[B]].read(tupleEnd.replaceAllIn(a.last, _.group(1)))
   })
 
-  implicit def seqTupleRead[A: Reader, B: Reader]: Reader[Seq[(A, B)]] = read(s =>
-    tuples.findAllMatchIn(s).map(m => implicitly[Reader[(A, B)]].read(m.group(1))).toSeq)
+  implicit def listRead[S: Reader]: Reader[List[S]] =
+    toReader[List[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toList)
 
-  implicit def seqRead[A: Reader]: Reader[Seq[A]] =
-    read(s => commaDelim.split(s).map(implicitly[Reader[A]].read).toSeq)
+  object ops {
+    implicit class pp[T](s: String) {
 
-
-//  implicit def listRead[A: Reader]: Reader[List[A]] =
-//    map(seqRead[A])(_.toList)
-
-//  implicit def listTupleRead[A: Reader, B: Reader]: Reader[List[(A, B)]] =
-//    map(seqTupleRead[A,B])(_.toList)
+      def read[T : Reader] = implicitly[Reader[T]].read(s)
+    }
+  }
 }
 
-object Demo {
-
-  //def translate[T](s: String)(implicit ev: Reader[T]): T = ev.read(s)
-  def translate[Seq[A], A](s: String)(implicit ev: Reader[Seq[A]]) = ev.read(s)
-  def translate[List[A], A](s: String)(implicit ev: Reader[Seq[A]]) = ev.read(s).toList
-}
+//object Demo {
+//
+//  //def translate[T](s: String)(implicit ev: Reader[T]): T = ev.read(s)
+//  def translate[Seq[A], A](s: String)(implicit ev: Reader[Seq[A]]) = ev.read(s)
+//  def translate[List[A], A](s: String)(implicit ev: Reader[Seq[A]]) = ev.read(s).toList
+//}
 
 object Main {
 
-  val sequence = "1, 2, 3, 4, 5"
-  val seqOfTuples = "(one, 1), (two,  2), (three ,  3)"
+  import Reader.ops._
 
+  val sequence = "1, 2, 3, 4, 5"
+  val seqOfTuples = "(one | 1), (two|  2), (three |3)"
+  val date = "2016-02-12"
 
   def main(args: Array[String]): Unit = {
     import Adaptor._
-    import Demo._
 
-    println(translate[List, Int](sequence).mkString(", "))
+    println(Reader[List[Int]].read(sequence).mkString(", "))
+    println(Reader[List[(String,Int)]].read(seqOfTuples).mkString(", "))
+    println(Reader[Calendar].read(date).getTime)
 
-     println(translate[Seq, Double](sequence).mkString(", "))
-//
-//    println(translate[Seq[(String, Int)]](seqOfTuples).mkString(", "))
-
+    println("true".read[Boolean])
 
     /////////////////////
 
