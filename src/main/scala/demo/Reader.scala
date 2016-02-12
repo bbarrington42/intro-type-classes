@@ -30,7 +30,7 @@ object Reader {
   val tupleEnd = """([^|]+)\s*\)\s*""".r
 
 
-  private def toReader[T](f: String => T): Reader[T] = new Reader[T] {
+  def toReader[T](f: String => T): Reader[T] = new Reader[T] {
       def read(s: String) = f(s)
   }
 
@@ -57,7 +57,7 @@ object Reader {
 
   implicit val calendarRead: Reader[Calendar] = calendarReader("yyyy-MM-dd")
 
-  implicit val fileRead: Reader[File] = toReader(new File(_))
+  //implicit val fileRead: Reader[File] = toReader(new File(_))
 
   private def calendarReader(pattern: String): Reader[Calendar] = calendarReader(pattern, Locale.getDefault)
   private def calendarReader(pattern: String, locale: Locale): Reader[Calendar] =
@@ -79,23 +79,20 @@ object Reader {
     toReader[List[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toList)
 
   object ops {
-    implicit class pp[T](s: String) {
+    implicit class stringWithReader[T](s: String) {
 
       def read[T : Reader] = implicitly[Reader[T]].read(s)
     }
   }
 }
 
-//object Demo {
-//
-//  //def translate[T](s: String)(implicit ev: Reader[T]): T = ev.read(s)
-//  def translate[Seq[A], A](s: String)(implicit ev: Reader[Seq[A]]) = ev.read(s)
-//  def translate[List[A], A](s: String)(implicit ev: Reader[Seq[A]]) = ev.read(s).toList
-//}
 
 object Main {
 
   import Reader.ops._
+
+  implicit val fileRead: Reader[File] = Reader.toReader(new File(_))
+
 
   val sequence = "1, 2, 3, 4, 5"
   val seqOfTuples = "(one | 1), (two|  2), (three |3)"
@@ -109,6 +106,8 @@ object Main {
     println(Reader[Calendar].read(date).getTime)
 
     println("true".read[Boolean])
+
+    println("myFile".read[File].getName)
 
     /////////////////////
 
