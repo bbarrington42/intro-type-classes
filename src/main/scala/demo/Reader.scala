@@ -3,16 +3,16 @@ package demo
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.{Calendar, GregorianCalendar, Locale}
-
 import scala.annotation.implicitNotFound
-
+import scala.util.control.{Exception => Except}
 
 
 @implicitNotFound("No member of type class Reader in scope for ${T}")
 trait Reader[T] {
   def read(s: String): T
 
-  // TODO Add readOption ?
+  def readOption(s: String): Option[T] =
+    Except.allCatch.opt(read(s))
 }
 
 /*
@@ -79,9 +79,9 @@ object Reader {
     toReader[List[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toList)
 
   object ops {
-    implicit class stringWithReader[T](s: String) {
-
-      def read[T : Reader] = implicitly[Reader[T]].read(s)
+    implicit class stringWithReader(s: String) {
+      def read[T: Reader] = implicitly[Reader[T]].read(s)
+      def readOption[T: Reader] = implicitly[Reader[T]].readOption(s)
     }
   }
 }
@@ -91,7 +91,13 @@ object Main {
 
   import Reader.ops._
 
-  implicit val fileRead: Reader[File] = Reader.toReader(new File(_))
+  implicit val fileRead: Reader[File] = new Reader[File] {
+    override def read(s: String): File = new File(s)
+    override def readOption(s: String): Option[File] = {
+      val file = read(s)
+      if(file.exists()) Some(file) else None
+    }
+  }
 
 
   val sequence = "1, 2, 3, 4, 5"
@@ -105,9 +111,9 @@ object Main {
     println(Reader[List[(String,Int)]].read(seqOfTuples).mkString(", "))
     println(Reader[Calendar].read(date).getTime)
 
-    println("true".read[Boolean])
+    println("true".readOption[Boolean])
 
-    println("myFile".read[File].getName)
+    println("myFile".readOption[File])
 
     /////////////////////
 
