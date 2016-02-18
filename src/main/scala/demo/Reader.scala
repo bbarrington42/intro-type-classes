@@ -57,7 +57,7 @@ object Reader {
 
   implicit val calendarRead: Reader[Calendar] = calendarReader("yyyy-MM-dd")
 
-  //implicit val fileRead: Reader[File] = toReader(new File(_))
+  implicit val fileRead: Reader[File] = toReader(new File(_))
 
   private def calendarReader(pattern: String): Reader[Calendar] = calendarReader(pattern, Locale.getDefault)
   private def calendarReader(pattern: String, locale: Locale): Reader[Calendar] =
