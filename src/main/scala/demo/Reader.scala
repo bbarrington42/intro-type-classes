@@ -38,7 +38,7 @@ object Reader {
 
   def apply[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
-  // Not sure we need this (?)
+  // Used below to form an implicit for Lists from Seqs
   private def map[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
     override def read(s: String): B = f(reader.read(s))
   }
@@ -73,6 +73,7 @@ object Reader {
     }
 
 
+  // Even implicits can take implicits as parameters!
   implicit def tupleRead[A: Reader, B: Reader]: Reader[(A, B)] = toReader(s => {
     val a = tupleDelim.split(s)
     implicitly[Reader[A]].read(tupleStart.replaceAllIn(a.head, _.group(1))) ->
@@ -82,8 +83,8 @@ object Reader {
   implicit def seqRead[S: Reader]: Reader[Seq[S]] =
     toReader[Seq[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toSeq)
 
-  // Even implicits can take implicits as parameters!
   implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = map(ev)(_.toList)
+
 
   object ops {
     implicit class stringWithReader(s: String) {
