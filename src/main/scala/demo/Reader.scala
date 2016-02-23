@@ -30,19 +30,22 @@ object Reader {
   val tupleEnd = """([^|]+)\s*\)\s*""".r
 
 
-  def toReader[T](f: String => T): Reader[T] = new Reader[T] {
-      def read(s: String) = f(s)
-  }
 
   // For direct construction of a Readable instance
   def apply[T: Reader]: Reader[T] = implicitly[Reader[T]]
   // Same as:
   // def apply[T](implicit instance: Reader[T]): Reader[T] = instance
 
+  def apply[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
   // Not sure we need this (?)
   private def map[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
     override def read(s: String): B = f(reader.read(s))
+  }
+
+  // To make construction cleaner
+  private def toReader[T](f: String => T): Reader[T] = new Reader[T] {
+    def read(s: String) = f(s)
   }
 
   implicit val intRead: Reader[Int] = toReader(_.toInt)
@@ -60,6 +63,7 @@ object Reader {
   implicit val fileRead: Reader[File] = toReader(new File(_))
 
   private def calendarReader(pattern: String): Reader[Calendar] = calendarReader(pattern, Locale.getDefault)
+
   private def calendarReader(pattern: String, locale: Locale): Reader[Calendar] =
     toReader { s =>
       val fmt = new SimpleDateFormat(pattern)
@@ -75,8 +79,11 @@ object Reader {
       implicitly[Reader[B]].read(tupleEnd.replaceAllIn(a.last, _.group(1)))
   })
 
-  implicit def listRead[S: Reader]: Reader[List[S]] =
-    toReader[List[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toList)
+  implicit def seqRead[S: Reader]: Reader[Seq[S]] =
+    toReader[Seq[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toSeq)
+
+  // Even implicits can take implicits as parameters!
+  implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = map(ev)(_.toList)
 
   object ops {
     implicit class stringWithReader(s: String) {
@@ -111,6 +118,8 @@ object Main {
     println(Reader[List[(String,Int)]].read(seqOfTuples).mkString(", "))
     println(Reader[Calendar].read(date).getTime)
 
+    println(Reader[Calendar](date).getTime)
+
     println("true".readOption[Boolean])
 
     println("myFile".readOption[File])
@@ -118,6 +127,7 @@ object Main {
     /////////////////////
 
     println(translateUsing(sequence, DoubleListReader).mkString(", "))
+
 
   }
 }

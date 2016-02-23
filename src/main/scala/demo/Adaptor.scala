@@ -1,6 +1,6 @@
 package demo
 
-import java.io.{StringReader, File}
+import java.io.File
 
 /**
   * Created by bbarrington on 2/10/16.
