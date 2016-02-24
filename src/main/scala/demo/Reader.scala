@@ -2,7 +2,7 @@ package demo
 
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.{Calendar, GregorianCalendar, Locale}
+import java.util.{Date, Calendar, GregorianCalendar, Locale}
 import scala.annotation.implicitNotFound
 import scala.util.control.{Exception => Except}
 
@@ -30,15 +30,24 @@ object Reader {
   val tupleEnd = """([^|]+)\s*\)\s*""".r
 
 
+  // The simple ones first...
+  def read[T](s: String)(implicit ev: Reader[T]): T = ev.read(s)
+  // OR...
+  //def read[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
+
+  // Now we can get fancy using 'apply...'
   // For direct construction of a Readable instance
   def apply[T: Reader]: Reader[T] = implicitly[Reader[T]]
+
   // Same as:
   // def apply[T](implicit instance: Reader[T]): Reader[T] = instance
 
+  // With this we can just supply the String as an argument to the Reader object itself
   def apply[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
-  // Used below to form an implicit for Lists from Seqs
+
+  // Used below to form an implicit to Lists from Seqs
   private def map[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
     override def read(s: String): B = f(reader.read(s))
   }
@@ -59,6 +68,11 @@ object Reader {
   implicit val booleanRead: Reader[Boolean] = toReader(_.toBoolean)
 
   implicit val calendarRead: Reader[Calendar] = calendarReader("yyyy-MM-dd")
+
+  implicit val dateRead: Reader[Date] = toReader(s => {
+    val df = new SimpleDateFormat("yyyy-MM-dd")
+    df.parse(s)
+  })
 
   implicit val fileRead: Reader[File] = toReader(new File(_))
 
@@ -85,6 +99,9 @@ object Reader {
 
   implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = map(ev)(_.toList)
 
+  // TODO Find out why this doesn't compile (??)
+  //implicit def listRead[S: Reader[Seq]]: Reader[List[S]] = map(implicitly[Reader[Seq[S]]])(_.toList)
+
 
   object ops {
     implicit class stringWithReader(s: String) {
@@ -108,18 +125,23 @@ object Main {
   }
 
 
-  val sequence = "1, 2, 3, 4, 5"
+  val ints = "1, 2, 3, 4, 5"
   val seqOfTuples = "(one | 1), (two|  2), (three |3)"
   val date = "2016-02-12"
 
   def main(args: Array[String]): Unit = {
     import Adaptor._
 
-    println(Reader[List[Int]].read(sequence).mkString(", "))
+    println(Reader.read[List[Int]](ints))
+
+
+    println(Reader[List[Int]].read(ints).mkString(", "))
     println(Reader[List[(String,Int)]].read(seqOfTuples).mkString(", "))
     println(Reader[Calendar].read(date).getTime)
 
     println(Reader[Calendar](date).getTime)
+
+    println(date.read[Date])
 
     println("true".readOption[Boolean])
 
@@ -127,7 +149,7 @@ object Main {
 
     /////////////////////
 
-    println(translateUsing(sequence, DoubleListReader).mkString(", "))
+    println(translateUsing(ints, DoubleListReader).mkString(", "))
 
 
   }
