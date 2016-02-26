@@ -47,7 +47,7 @@ object Reader {
   def apply[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
 
-  // Used below to form an implicit to Lists from Seqs
+  // A reader of one type can be transformed to another
   private def map[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
     override def read(s: String): B = f(reader.read(s))
   }
@@ -99,7 +99,7 @@ object Reader {
 
   implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = map(ev)(_.toList)
 
-  // TODO Find out why this doesn't compile (??)
+  // TODO Doesn't compile (doesn't like context syntax)
   //implicit def listRead[S: Reader[Seq]]: Reader[List[S]] = map(implicitly[Reader[Seq[S]]])(_.toList)
 
 
@@ -132,8 +132,11 @@ object Main {
   def main(args: Array[String]): Unit = {
     import Adaptor._
 
+    println("9".read[Double])
+
     println(Reader.read[List[Int]](ints))
 
+    println(Reader[List[Double]](ints))
 
     println(Reader[List[Int]].read(ints).mkString(", "))
     println(Reader[List[(String,Int)]].read(seqOfTuples).mkString(", "))
