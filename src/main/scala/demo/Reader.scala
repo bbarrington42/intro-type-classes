@@ -70,10 +70,10 @@ object Reader {
 
   implicit val calendarRead: Reader[Calendar] = calendarReader("yyyy-MM-dd")
 
-  implicit val dateRead: Reader[Date] = toReader(s => {
+  implicit val dateRead: Reader[Date] = toReader { s =>
     val df = new SimpleDateFormat("yyyy-MM-dd")
     df.parse(s)
-  })
+  }
 
   implicit val fileRead: Reader[File] = toReader(new File(_))
 
@@ -81,7 +81,7 @@ object Reader {
 
   private def calendarReader(pattern: String, locale: Locale): Reader[Calendar] =
     toReader { s =>
-      val fmt = new SimpleDateFormat(pattern)
+      val fmt = new SimpleDateFormat(pattern, locale)
       val c = new GregorianCalendar
       c.setTime(fmt.parse(s))
       c
