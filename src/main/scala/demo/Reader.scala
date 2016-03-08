@@ -19,6 +19,7 @@ trait Reader[T] {
   Grammar:
     tuples: (x | y)
     lists: x, y, z
+    lists of tuples: (x | y), (r | s)
  */
 
 
@@ -31,24 +32,24 @@ object Reader {
 
 
   // The simple ones first...
-  def read[T](s: String)(implicit ev: Reader[T]): T = ev.read(s)
+  //def read[T](s: String)(implicit ev: Reader[T]): T = ev.read(s)
   // OR...
-  //def read[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
+  def read[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
 
   // Now we can get fancy using 'apply...'
   // For direct construction of a Readable instance
-  def apply[T: Reader]: Reader[T] = implicitly[Reader[T]]
+  //def apply[T: Reader]: Reader[T] = implicitly[Reader[T]]
 
   // Same as:
-  // def apply[T](implicit instance: Reader[T]): Reader[T] = instance
+  def apply[T](implicit instance: Reader[T]): Reader[T] = instance
 
   // With this we can just supply the String as an argument to the Reader object itself
   def apply[T: Reader](s: String): T = implicitly[Reader[T]].read(s)
 
 
   // A reader of one type can be transformed to another
-  private def map[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
+  private def xform[A,B](reader: Reader[A])(f: A => B): Reader[B] = new Reader[B] {
     override def read(s: String): B = f(reader.read(s))
   }
 
@@ -97,7 +98,7 @@ object Reader {
   implicit def seqRead[S: Reader]: Reader[Seq[S]] =
     toReader[Seq[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toSeq)
 
-  implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = map(ev)(_.toList)
+  implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = xform(ev)(_.toList)
 
   // TODO Doesn't compile (doesn't like context syntax)
   //implicit def listRead[S: Reader[Seq]]: Reader[List[S]] = map(implicitly[Reader[Seq[S]]])(_.toList)
@@ -109,6 +110,7 @@ object Reader {
       def readOption[T: Reader] = implicitly[Reader[T]].readOption(s)
     }
   }
+
 }
 
 
@@ -126,8 +128,8 @@ object Main {
 
 
   val ints = "1, 2, 3, 4, 5"
-  val seqOfTuples = "(one | 1), (two|  2), (three |3)"
-  val date = "2016-02-12"
+  val tuples = "(one | 1), (two|  2), (three |3)"
+  val date = "2016-03-16"
 
   def main(args: Array[String]): Unit = {
     import Adaptor._
@@ -139,12 +141,16 @@ object Main {
     println(Reader[List[Double]](ints))
 
     println(Reader[List[Int]].read(ints).mkString(", "))
-    println(Reader[List[(String,Int)]].read(seqOfTuples).mkString(", "))
+    println(Reader[List[(String,Int)]].read(tuples).mkString(", "))
     println(Reader[Calendar].read(date).getTime)
 
     println(Reader[Calendar](date).getTime)
 
+    println(Reader[Date](date))
+
     println(date.read[Date])
+
+    "1944-06-06".read[Date]
 
     println("true".readOption[Boolean])
 
