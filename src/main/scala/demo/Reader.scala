@@ -91,17 +91,19 @@ object Reader {
   // Even implicits can take implicits as parameters!
   implicit def tupleRead[A: Reader, B: Reader]: Reader[(A, B)] = toReader(s => {
     val a = tupleDelim.split(s)
-    implicitly[Reader[A]].read(tupleStart.replaceAllIn(a.head, _.group(1))) ->
-      implicitly[Reader[B]].read(tupleEnd.replaceAllIn(a.last, _.group(1)))
+    Reader[A].read(tupleStart.replaceAllIn(a.head, _.group(1))) ->
+      Reader[B].read(tupleEnd.replaceAllIn(a.last, _.group(1)))
   })
 
+  // Notice there is no need to use 'implicitly' to bring Reader[S] into scope.
   implicit def seqRead[S: Reader]: Reader[Seq[S]] =
-    toReader[Seq[S]](s => commaDelim.split(s).map(implicitly[Reader[S]].read).toSeq)
+    toReader[Seq[S]](s => commaDelim.split(s).map(Reader[S].read).toSeq)
 
-  implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = xform(ev)(_.toList)
+  // implicit argument
+  //implicit def listRead[S](implicit ev: Reader[Seq[S]]): Reader[List[S]] = xform(ev)(_.toList)
 
-  // TODO Doesn't compile (doesn't like context syntax)
-  //implicit def listRead[S: Reader[Seq]]: Reader[List[S]] = map(implicitly[Reader[Seq[S]]])(_.toList)
+  // Or we can use context bounds syntax
+  implicit def listRead[S: Reader]: Reader[List[S]] = xform(Reader[Seq[S]])(_.toList)
 
 
   object ops {
@@ -132,7 +134,6 @@ object Main {
   val date = "2016-03-16"
 
   def main(args: Array[String]): Unit = {
-    import Adaptor._
 
     println("9".read[Double])
 
@@ -155,11 +156,6 @@ object Main {
     println("true".readOption[Boolean])
 
     println("myFile".readOption[File])
-
-    /////////////////////
-
-    println(translateUsing(ints, DoubleListReader).mkString(", "))
-
 
   }
 }
